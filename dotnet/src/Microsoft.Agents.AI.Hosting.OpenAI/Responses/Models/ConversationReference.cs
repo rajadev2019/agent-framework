@@ -11,7 +11,7 @@ namespace Microsoft.Agents.AI.Hosting.OpenAI.Responses.Models;
 /// Represents a reference to a conversation, which can be either a conversation ID (string) or a conversation object.
 /// </summary>
 [JsonConverter(typeof(ConversationReferenceJsonConverter))]
-internal sealed record ConversationReference
+internal sealed class ConversationReference
 {
     /// <summary>
     /// The conversation ID.
@@ -42,6 +42,7 @@ internal sealed record ConversationReference
 /// </summary>
 internal sealed class ConversationReferenceJsonConverter : JsonConverter<ConversationReference>
 {
+    /// <inheritdoc/>
     public override ConversationReference? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         if (reader.TokenType == JsonTokenType.String)
@@ -61,7 +62,7 @@ internal sealed class ConversationReferenceJsonConverter : JsonConverter<Convers
 
             if (root.TryGetProperty("metadata", out var metadataProp) && metadataProp.ValueKind == JsonValueKind.Object)
             {
-                metadata = JsonSerializer.Deserialize(metadataProp.GetRawText(), ResponsesJsonContext.Default.DictionaryStringString);
+                metadata = JsonSerializer.Deserialize(metadataProp.GetRawText(), OpenAIHostingJsonContext.Default.DictionaryStringString);
             }
 
             return id is null ? null : ConversationReference.FromObject(id, metadata);
@@ -74,6 +75,7 @@ internal sealed class ConversationReferenceJsonConverter : JsonConverter<Convers
         throw new JsonException($"Unexpected token type for ConversationReference: {reader.TokenType}");
     }
 
+    /// <inheritdoc/>
     public override void Write(Utf8JsonWriter writer, ConversationReference value, JsonSerializerOptions options)
     {
         if (value is null)
@@ -82,22 +84,18 @@ internal sealed class ConversationReferenceJsonConverter : JsonConverter<Convers
             return;
         }
 
-        // If only ID is present and no metadata, serialize as a simple string
-        if (value.Metadata is null || value.Metadata.Count == 0)
+        // Ideally if only ID is present and no metadata, we would serialize as a simple string.
+        // However, while a request's "conversation" property can be either a string or an object
+        // containing a string, a response's "conversation" property is always an object. Since
+        // here we don't know which scenario we're in, we always serialize as an object, which works
+        // in any scenario.
+        writer.WriteStartObject();
+        writer.WriteString("id", value.Id);
+        if (value.Metadata is not null)
         {
-            writer.WriteStringValue(value.Id);
+            writer.WritePropertyName("metadata");
+            JsonSerializer.Serialize(writer, value.Metadata, OpenAIHostingJsonContext.Default.DictionaryStringString);
         }
-        else
-        {
-            // Otherwise, serialize as an object
-            writer.WriteStartObject();
-            writer.WriteString("id", value.Id);
-            if (value.Metadata is not null)
-            {
-                writer.WritePropertyName("metadata");
-                JsonSerializer.Serialize(writer, value.Metadata, ResponsesJsonContext.Default.DictionaryStringString);
-            }
-            writer.WriteEndObject();
-        }
+        writer.WriteEndObject();
     }
 }

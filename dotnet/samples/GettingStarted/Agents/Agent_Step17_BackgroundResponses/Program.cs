@@ -1,11 +1,11 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
-// This sample shows how to use background responses with ChatClientAgent and OpenAI Responses.
+// This sample shows how to use background responses with ChatClientAgent and Azure OpenAI Responses.
 
 using Azure.AI.OpenAI;
 using Azure.Identity;
 using Microsoft.Agents.AI;
-using OpenAI;
+using OpenAI.Responses;
 
 var endpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT") ?? throw new InvalidOperationException("AZURE_OPENAI_ENDPOINT is not set.");
 var deploymentName = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT_NAME") ?? "gpt-4o-mini";
@@ -13,8 +13,8 @@ var deploymentName = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT
 AIAgent agent = new AzureOpenAIClient(
     new Uri(endpoint),
     new AzureCliCredential())
-     .GetOpenAIResponseClient(deploymentName)
-     .CreateAIAgent(instructions: "You are good at telling jokes.", name: "Joker");
+     .GetResponsesClient(deploymentName)
+     .CreateAIAgent();
 
 // Enable background responses (only supported by OpenAI Responses at this time).
 AgentRunOptions options = new() { AllowBackgroundResponses = true };
@@ -22,7 +22,7 @@ AgentRunOptions options = new() { AllowBackgroundResponses = true };
 AgentThread thread = agent.GetNewThread();
 
 // Start the initial run.
-AgentRunResponse response = await agent.RunAsync("Tell me a joke about a pirate.", thread, options);
+AgentRunResponse response = await agent.RunAsync("Write a very long novel about otters in space.", thread, options);
 
 // Poll until the response is complete.
 while (response.ContinuationToken is { } token)
@@ -45,7 +45,7 @@ thread = agent.GetNewThread();
 
 AgentRunResponseUpdate? lastReceivedUpdate = null;
 // Start streaming.
-await foreach (AgentRunResponseUpdate update in agent.RunStreamingAsync("Tell me a joke about a pirate.", thread, options))
+await foreach (AgentRunResponseUpdate update in agent.RunStreamingAsync("Write a very long novel about otters in space.", thread, options))
 {
     // Output each update.
     Console.Write(update.Text);
